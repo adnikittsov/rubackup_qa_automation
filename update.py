@@ -34,6 +34,7 @@ def main_func(comm):
         subprocess.run([comm], shell=True, check=True)
     except subprocess.CalledProcessError as error:
         sys.stderr.write(str(error))
+        sys.exit()
 
 def pre_update(update_type, remove):
     services = ['server', 'client']
