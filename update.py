@@ -4,53 +4,45 @@ import os
 import sys
 import subprocess
 
-def get_pkg_names_from_args():
-    names = []
-    for arg in arg_list[1:]:
-        names.append(arg)
-    return names
-
-def write_pkg_names_to_file(names):
-    with open(path, "w") as file:
-        for i in range(len(names)):
-            file.write(names[i] + '\n')
-
-def check_config_file(path):
-    if os.path.exists(path):
-        read_pkg_names_from_file()
-        print("Config file exists. Prepare to update.")
-        return 0
-    else:
-        print("File " + path + " not exist. Exit.")
-        sys.exit(1)
-
-def read_pkg_names_from_file():
-    with open(path, "r") as file:
-        pkg_names = file.readlines()
-    return pkg_names
-
 def main_func(comm):
     try:
         subprocess.run([comm], shell=True, check=True)
     except subprocess.CalledProcessError as error:
         sys.stderr.write(str(error))
-        sys.exit()
 
-def pre_update(update_type, remove):
+def pre_update(update_type):
     services = ['server', 'client']
-    if update_type == 'client':
-        main_func('systemctl stop rubackup_' + services[1])
-    elif update_type == 'server':
-        for i in services:
-            main_func('systemctl stop rubackup_' + i)
-    main_func(f'{remove} remove -y rubackup-common')
-    os.system('rm -rf rub*')
-    print("Environment is ready to update stand")
+    try:
+        if update_type == 'client':
+            main_func('systemctl stop rubackup_' + services[1])
+        elif update_type == 'server':
+            for i in services:
+                 main_func('systemctl stop rubackup_' + i)
+    finally:
+        main_func(f'apt remove -y rubackup-common')
+        os.system('rm -f rub*')
 
-def wget_and_install(pkg_type, os_type, install, pkgs_list):
+def get_pkg_list(update_type):
+    if update_type == 'server':
+        pkgs = ['rubackup-common', 'rubackup-client', 'rubackup-server', 'rubackup-rbm']
+        return pkgs
+    elif update_type == 'client':
+        pkgs = ['rubackup-common', 'rubackup-client']
+        return pkgs
+
+def create_wget_list(pkgs, os_type):
+    pkg_list = []
+    for pkg in pkgs:
+        if os_type == 'ubuntu_20.04' or 'ubuntu_18.04':
+            pkg_list.append(f"{pkg}.deb")
+        elif os_type == 'astra_1.7' or 'astra_1.6':
+            pkg_list.append(f"{pkg}_signed.deb")
+    return pkg_list
+
+def wget_and_install(os_type, pkgs_list):
     for pkg in pkgs_list:
-        main_func(f'wget 10.177.32.37:8080/latest/{pkg_type}/{os_type}/{pkg}')
-        main_func(f'{install} -i {pkg}')
+        main_func(f'wget 10.177.32.37:8080/latest/deb/{os_type}/{pkg}')
+        main_func(f'dpkg -i {pkg}')
 
 def rb_init(update_type):
     iface = input("Enter iface: ")
@@ -68,7 +60,7 @@ def rb_init(update_type):
         elif node_type == 'm':
             primary_server = input("Enter hostname of primary server: ")
             main_func(f'rb_init -y -n media-server -c {primary_server} -H {primary_server} -Y 12345 -i {iface} -l /rubackup-tmp')
-    print('rb_init complete successfull')
+
 
 def post_update(update_type):
     services = ['client', 'server']
@@ -81,19 +73,12 @@ def post_update(update_type):
 
     print('Stand has been updated')
 
-pkg_type, install, remove = 'deb', 'dpkg', 'apt'
-arg_list = sys.argv
-path = "/etc/qa_update_stand.conf"
-os_type = input('Chose OS type (ubuntu_20.04/astra_1.7/astra_1.6): ')
-update_type = input('Chose node type (server/client): ')
 
-if len(arg_list) != 1:
-    write_pkg_names_to_file(get_pkg_names_from_args())
-    print("Packages names was write into qa_update_stand successfully")
-else:
-    check_config_file(path)
-pre_update(update_type, remove)
-wget_and_install(pkg_type, os_type, install, read_pkg_names_from_file())
+
+os_type = input('Chose OS type (ubuntu_20.04/ubuntu_18.04/astra_1.7/astra_1.6): ')
+update_type = input('Chose node type (server/client): ')
+pre_update(update_type)
+wget_and_install(os_type, create_wget_list(get_pkg_list(update_type), os_type))
 rb_init(update_type)
 post_update(update_type)
 
