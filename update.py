@@ -9,6 +9,7 @@ def main_func(comm):
         subprocess.run([comm], shell=True, check=True)
     except subprocess.CalledProcessError as error:
         sys.stderr.write(str(error))
+        sys.exit(1)
 
 def pre_update(update_type):
     services = ['server', 'client']
@@ -21,13 +22,12 @@ def pre_update(update_type):
     finally:
         main_func(f'apt remove -y rubackup-common')
         os.system('rm -f rub*')
-
 def get_pkg_list(update_type):
+    pkgs = ['rubackup-common', 'rubackup-client', 'rubackup-server', 'rubackup-rbm']
     if update_type == 'server':
-        pkgs = ['rubackup-common', 'rubackup-client', 'rubackup-server', 'rubackup-rbm']
         return pkgs
     elif update_type == 'client':
-        pkgs = ['rubackup-common', 'rubackup-client']
+        pkgs = pkgs[:2]
         return pkgs
 
 def create_wget_list(pkgs, os_type):
